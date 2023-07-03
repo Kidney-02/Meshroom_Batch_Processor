@@ -24,6 +24,7 @@ def check_directory_exists(path: str):
         return False
     return True
 
+
 def check_directory_empty(path: str) -> int:
     """
     checks if given directory is empty
@@ -36,6 +37,7 @@ def check_directory_empty(path: str) -> int:
     ## check if empty
     return 2 if len(os.listdir(path)) != 0 else 0  ## return 0 if empty and 2 if not empty
 
+
 def check_meshroom_batch_exists(path: str) -> bool:
     """
     Takes meshroom_batch path and checks if it exists or not
@@ -43,6 +45,7 @@ def check_meshroom_batch_exists(path: str) -> bool:
     :return:
     """
     if not check_directory_exists(path):
+        print("WARNING:", "Meshroom directory is wrong")
         return False
 
     meshroom_batch = os.path.join(path, "meshroom_batch.exe")
@@ -51,8 +54,9 @@ def check_meshroom_batch_exists(path: str) -> bool:
         # print("Meshroom_batch found")
         return True
     else:
-        print("WARNING:", "Meshroom directory doesn't contain meshroom_batch.exe")
+        print("WARNING:", "Meshroom directory doesn't contain 'meshroom_batch.exe'")
         return False
+
 
 def count_images_in_directory(path: str) -> int:
     """
@@ -74,6 +78,7 @@ def count_images_in_directory(path: str) -> int:
                 pass
     print(f"Image directory found. {count} images found")
     return count
+
 
 def check_custom_pipeline_valid(path: str) -> str:
     """
@@ -109,6 +114,7 @@ def check_custom_pipeline_valid(path: str) -> str:
         print(f"No pipeline input, using template - {os.path.basename(path)}")
         return path
 
+
 def check_node(to_node: str, pipeline: str) -> bool:
     ## check if pipeline exists
     pipeline_file = check_custom_pipeline_valid(pipeline)
@@ -132,6 +138,7 @@ def check_node(to_node: str, pipeline: str) -> bool:
         print("WARNING:", f"Node '{to_node}' not found in '{pipeline_file}'")
         return False
 
+
 def check_task_path(path: str, name: str, task: str = "") -> bool:
     ## Needs to check if folder with image name exists to validate
     """
@@ -154,6 +161,7 @@ def check_task_path(path: str, name: str, task: str = "") -> bool:
 
     return True
 
+
 def find_ui_file() -> str:
     # Get the current working directory
     cwd = os.getcwd()
@@ -171,6 +179,7 @@ def find_ui_file() -> str:
         print(".ui file not found")
         return ""
 
+
 def filter_data(data: dict) -> dict:
     filtered_data = {
         "meshroom_dir": data.get("meshroom_dir"),
@@ -183,15 +192,18 @@ def filter_data(data: dict) -> dict:
     }
     return filtered_data
 
-def make_bash_command(data: dict) -> str:
-    ## Test if inputs are valid in get parameters
-    # if not self.validate_inputs(data):
-    #     return ""
 
+def make_bash_command(data: dict) -> str:
+    """
+    makes a bash command that runs meshroom_batch.exe
+    :param data: data to make command
+    :return:
+    """
     pipeline = check_custom_pipeline_valid(data["custom_pipeline"])
 
     name = os.path.basename(data["image_dir"])  ## get name based on input folder name
     save_path = os.path.join(data["work_dir"], name)
+    ## Crashes if save_path already exists, should be prevented by validating
     os.mkdir(save_path)
     save_dir = os.path.join(save_path, f"{name}.mg")
 
@@ -203,6 +215,7 @@ def make_bash_command(data: dict) -> str:
     command = format_bash_command(meshroom_batch, image_dir, pipeline, to_node, save_dir, output_dir)
 
     return command
+
 
 def format_bash_command(meshroom_batch: str, images: str, pipeline: str, to_node: str, save: str,
                         output: str) -> str:
@@ -220,6 +233,123 @@ def format_bash_command(meshroom_batch: str, images: str, pipeline: str, to_node
     command = f"{meshroom_batch} --input {images} --pipeline {pipeline} --toNode {to_node} --save {save} --output {output}"
 
     return command
+
+
+##########################################################################################
+####    BLENDER    #######
+##########################################################################################
+
+def blender_unwrap(blender_dir: str, import_path: str, export_path: str):
+    """
+    Import mesh to blender for unwrap
+    :param blender_dir:
+    :param import_path:
+    :param export_path:
+    :return:
+    """
+    blender_exe = os.path.join(blender_dir, "blender.exe")
+    # Start Blender process
+    blender_cmd = [f"{blender_exe}", "--background"]
+    subprocess.run(blender_cmd)
+
+    # Import, Unwrap, Pack, and Export
+    # Python script as string to be run in command line
+    # No indent, or it might give errors
+    unwrap_script = f"""
+import bpy
+
+# Select all objects
+bpy.ops.object.select_all(action='SELECT')
+
+# Delete selected objects
+bpy.ops.object.delete(use_global=False, confirm=False)
+
+# Import object
+bpy.ops.import_scene.obj(filepath=r'{import_path}')
+
+# Switch to edit mode
+obj = bpy.context.scene.objects[0]
+bpy.context.view_layer.objects.active = obj
+bpy.ops.object.mode_set(mode='EDIT')
+
+## Perform UV unwrapping
+bpy.ops.uv.smart_project()
+
+## Pack UV islands
+bpy.ops.uv.select_all(action='SELECT')
+########################################################################
+##### Disabled until pack_islands is fixed in blender3.6 hopefully #####
+# bpy.ops.uv.pack_islands()
+########################################################################
+
+## Switch back to object mode
+bpy.ops.object.mode_set(mode='OBJECT')
+
+## Export object
+bpy.ops.export_scene.obj(filepath=r'{export_path}')
+
+## Quit
+##bpy.ops.wm.quit_blender()
+    """
+
+    unwrap_cmd = [f"{blender_exe}", "--background", "--python-expr", unwrap_script]
+    subprocess.run(unwrap_cmd)
+
+
+def check_blender_exe_exists(path: str) -> bool:
+    if not check_directory_exists(path):
+        print("WARNING:", "Blender directory is wrong")
+        return False
+
+    blender_exe = os.path.join(path, "blender.exe")
+    test = os.path.isfile(blender_exe)
+    if test:
+        # print("Blender.exe found")
+        return True
+    else:
+        print("WARNING:", "Blender directory doesn't contain 'blender.exe'")
+        return False
+
+
+def obj_import_path(work_path: str, name: str, node: str) -> str:
+    """
+    Returns path of the .obj file in the save directory of the selected node
+    :param work_path:
+    :param name:
+    :param node:
+    :return:
+    """
+    node_dir = os.path.join(work_path, name, "MeshroomCache", node)
+
+    ## get all 'uid' directories with weird names
+    uid_dirs = [f for f in os.listdir(node_dir) if os.path.isdir(os.path.join(node_dir, f))]
+    if not uid_dirs:
+        print("WARNING:", f"Mesh could not be found in {node} folder")
+        return ""
+
+    sorted_uids = sorted(uid_dirs, key=lambda f: os.path.getmtime(os.path.join(node_dir, f)), reverse=True)
+
+    latest_uid = os.path.join(node_dir, sorted_uids[0])
+
+    ## there's supposed to be only one .obj file per directory
+    obj = [f for f in os.listdir(latest_uid) if f.endswith(".obj")]
+    print(f"{obj[0]} found in {latest_uid}")
+    return os.path.join(latest_uid, obj[0])
+
+
+def obj_export_path(work_path: str, name: str) -> str:
+    """
+    Create export path for unwrapped mesh
+    :param work_path:
+    :param name:
+    :return: path of mesh to be exported from blender
+    """
+    unwrapped_dir = os.path.join(work_path, name, "MeshroomCache", "UnwrappedMesh")
+    if not os.path.exists(unwrapped_dir):
+        os.mkdir(unwrapped_dir)
+        print(unwrapped_dir, "created")
+    return os.path.join(unwrapped_dir, "mesh.obj")
+
 
 ###############################################
 ####    UI    ####
@@ -249,7 +379,7 @@ class ProcessorGUI(QMainWindow):
         self.button_load.clicked.connect(self.load)
         self.button_start.clicked.connect(self.start)
         self.button_validate.clicked.connect(self.validate_inputs)
-        self.button_output.clicked.connect(self.open_output)
+        self.button_info.clicked.connect(self.info)
 
         ## Check Inputs
         self.line_meshroom_dir.returnPressed.connect(self.get_parameters)
@@ -264,9 +394,11 @@ class ProcessorGUI(QMainWindow):
         ## Test if inputs are valid
         is_valid = True
 
-        name = os.path.basename(self.data["image_dir"])
+        name = self.get_name()
         print("#" * 80)
         if not check_meshroom_batch_exists(self.data["meshroom_dir"]):
+            is_valid = False
+        if not check_blender_exe_exists(self.data["blender_dir"]):
             is_valid = False
         if not check_task_path(self.data["work_dir"], name, "work"):
             is_valid = False
@@ -304,18 +436,24 @@ class ProcessorGUI(QMainWindow):
         self.line_work_dir.setText(str(self.data["work_dir"]))
         self.line_image_dir.setText(str(self.data["image_dir"]))
         self.line_output_dir.setText(str(self.data["output_dir"]))
+        self.line_pipeline.setText(str(self.data["custom_pipeline"]))
         self.line_to_node.setText(str(self.data["to_node"]))
 
     def start(self):
-        # self.get_parameters()
         self.save()
         command = make_bash_command(self.data)
-        if command == "":
-            print("Wrong data provided")
-            return
-        else:
-            print(command)
-            subprocess.run(command)
+
+        print("Running:", command)
+        subprocess.run(command)
+
+        print("Mesh Created")
+        name = self.get_name()
+        import_path = obj_import_path(self.data["work_dir"], name, self.data["to_node"])
+        export_path = obj_export_path(self.data["work_dir"], name)
+
+        print("Unwrapping")
+        blender_unwrap(self.data["blender_dir"], import_path, export_path)
+        print("Unwrapped")
 
     def save(self):
         """
@@ -328,9 +466,6 @@ class ProcessorGUI(QMainWindow):
         json_file = open(self.data_file, "w")
         json.dump(filtered_data, json_file, indent=4)
         json_file.close()
-
-        ## TEMP
-        # self.button_start.setEnabled(True)
 
     def load(self):
         try:
@@ -357,10 +492,11 @@ class ProcessorGUI(QMainWindow):
         self.validate_inputs()
         self.set_parameters()
 
-    def open_output(self):
-        name = os.path.basename(self.data["image_dir"])
-        output_path = os.path.join(self.data["output_dir"], name)
-        os.startfile(output_path)
+    def info(self):
+        print("INFO:", "Explanation, or link to github, idk")
+
+    def get_name(self):
+        return os.path.basename(self.data["image_dir"])
 
 
 def main():
@@ -371,5 +507,4 @@ def main():
 
 
 if __name__ == '__main__':
-    # print("Command:", command)
     main()
