@@ -456,7 +456,7 @@
        <item row="1" column="2">
         <widget class="QPushButton" name="button_load">
          <property name="text">
-          <string>load</string>
+          <string>Load</string>
          </property>
          <property name="checkable">
           <bool>false</bool>
@@ -464,9 +464,12 @@
         </widget>
        </item>
        <item row="2" column="2">
-        <widget class="QPushButton" name="button_open_log">
+        <widget class="QPushButton" name="button_output">
+         <property name="enabled">
+          <bool>false</bool>
+         </property>
          <property name="text">
-          <string>Open Log</string>
+          <string>Open Output</string>
          </property>
          <property name="checkable">
           <bool>false</bool>
@@ -508,6 +511,13 @@
           </size>
          </property>
         </spacer>
+       </item>
+       <item row="0" column="2">
+        <widget class="QPushButton" name="button_validate">
+         <property name="text">
+          <string>Validate</string>
+         </property>
+        </widget>
        </item>
       </layout>
      </item>

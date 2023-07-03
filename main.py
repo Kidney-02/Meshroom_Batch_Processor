@@ -12,7 +12,7 @@ import json
 
 def check_directory_exists(path: str):
     """
-    Check if work directory exists
+    Check if directory exists
     :param path:
     :return:
     """
@@ -50,29 +50,11 @@ def check_meshroom_batch_exists(path: str) -> bool:
     meshroom_batch = os.path.join(path, "meshroom_batch.exe")
     test = os.path.isfile(meshroom_batch)
     if test:
-        print("Meshroom_batch found")
+        # print("Meshroom_batch found")
         return True
     else:
-        print("Meshroom directory doesn't contain meshroom_batch.exe")
+        print("WARNING:", "Meshroom directory doesn't contain meshroom_batch.exe")
         return False
-
-
-def check_work_path(path: str) -> bool:
-    """
-    Checks if work directory is empty
-    :param path: work directory
-    :return:
-    """
-    test = check_directory_empty(path)
-    if test == 1:
-        print("Work directory does not exist")
-        return False
-    elif test == 2:
-        print("Work directory is not empty")
-        return False
-    elif test == 0:
-        print("Work directory found")
-        return True
 
 
 def count_images_in_directory(path: str) -> int:
@@ -82,9 +64,8 @@ def count_images_in_directory(path: str) -> int:
     :return:
     """
     if not check_directory_exists(path):
-        print("Images directory not valid")
+        print("WARNING:", "Images directory not valid")
         return -1
-    print("Image dir found")
     count = 0
     for filename in os.listdir(path):
         file_path = os.path.join(path, filename)
@@ -108,10 +89,10 @@ def check_custom_pipeline_valid(path: str) -> str:
     ## if not empty check if path is valid
     if path != "":
         if not os.path.exists(path):
-            print("Pipeline path input wrong")
+            print("WARNING:", "Pipeline path input wrong")
             return ""
         if os.path.isdir(path):
-            print("Pipeline path  input is a folder, meshroom graph expected")
+            print("WARNING:", "Pipeline path  input is a folder, meshroom graph file expected")
             return ""
         _, ext = os.path.splitext(path)  ## splits path from its extension
         if ext == ".mg":
@@ -126,47 +107,35 @@ def check_custom_pipeline_valid(path: str) -> str:
             has_template_pipeline = True
     ## If .mg file in script directory doesn't exist print warning
     if not has_template_pipeline:
-        print("No pipeline input, template not found")
+        print("WARNING:", "No pipeline input, template not found")
         return ""
     else:
         print(f"No pipeline input, using template - {os.path.basename(path)}")
         return path
 
 
-def check_output_path(path: str) -> bool:
+## Needs to check if folder with image name exists to validate
+def check_task_path(path: str, name: str, task: str = "") -> bool:
     """
-        Checks if output directory is empty
-        :param path: output directory
-        :return:
-        """
-    test = check_directory_empty(path)
-    if test == 1:
-        print("Output directory does not exist")
+    Checks if given directory exists and isn't used
+    :param path: work directory
+    :param name: name that will be used for creating a
+    :param task: task for which the directory is being validated (used for debug message only)
+    :return:
+    """
+    ## add space to end of task in case it doesn't have it
+    task += " " if not task.endswith(" ") and task != "" else ""
+
+    if not check_directory_exists(path):
+        print("WARNING:", f"Provided {task}directory does not exist")
         return False
-    elif test == 2:
-        print("Output directory is not empty")
+
+    if check_directory_exists(os.path.join(path, name)):
+        print("WARNING:", f"Folder with name '{name}' already exists in provided {task}directory")
         return False
-    elif test == 0:
-        print("Output directory found")
-        return True
 
+    return True
 
-###########################################################################
-
-
-###############################################
-####    DATA    ####
-###############################################
-
-## replace with user input later
-# meshroom_dir = r"C:\Users\kidne\AppData\Roaming\Meshroom-2023.2.0"  ## Meshroom installation path
-# blender_dir = r"C:\Users\kidne\AppData\Roaming\Meshroom-2023.2.0"  ## Blender installation path
-# images_dir = r"C:\Users\kidne\OneDrive\Documents\Meshroom\Meshroom\dataset_monstree-master\mini3"
-# work_dir = r"C:\Users\kidne\OneDrive\Documents\Meshroom\Meshroom\Test"  ## save and cache path
-# custom_pipeline = r"C:\Users\kidne\OneDrive\Documents\Meshroom\Meshroom\_Template\Photogrammetry_Remesh.mg"  ## what pipeline to use default provided
-# output_dir = r"C:\Users\kidne\OneDrive\Documents\Meshroom\Meshroom\Output"  ## where to place processed models and textures
-
-# log = ""
 
 ###############################################
 ####    UI    ####
@@ -191,9 +160,12 @@ class ProcessorGUI(QMainWindow):
         self.show()
         self.load()
 
+        ## Buttons
         self.button_save.clicked.connect(self.save)
         self.button_load.clicked.connect(self.load)
         self.button_start.clicked.connect(self.start)
+        self.button_validate.clicked.connect(self.validate_inputs)
+        self.button_output.clicked.connect(self.open_output)
 
         ## Check Inputs
         self.line_meshroom_dir.textChanged.connect(self.get_parameters)
@@ -220,24 +192,32 @@ class ProcessorGUI(QMainWindow):
             print(".ui file not found")
             return ""
 
-    def test_if_inputs_valid(self, data: dict) -> bool:
+    def validate_inputs(self) -> bool:
         ## Test if inputs are valid
-        if not check_meshroom_batch_exists(data["meshroom_dir"]):
+        is_valid = True
+
+        name = os.path.basename(self.data["image_dir"])
+        print("#" * 80)
+        if not check_meshroom_batch_exists(self.data["meshroom_dir"]):
+            is_valid = False
+        if not check_task_path(self.data["work_dir"], name, "work"):
+            is_valid = False
+        if count_images_in_directory(self.data["image_dir"]) <= 0:
+            is_valid = False
+        if check_custom_pipeline_valid(self.data["custom_pipeline"]) == "":
+            is_valid = False
+        if not check_task_path(self.data["output_dir"], name, "output"):
+            is_valid = False
+        print("#" * 80)
+
+        if is_valid:
+            print("All inputs are good")
+            self.button_start.setEnabled(True)
+            return True
+        else:
+            self.button_start.setEnabled(False)
             return False
 
-        if not check_work_path(data["work_dir"]):
-            return False
-
-        if count_images_in_directory(data["image_dir"]) <= 0:
-            return False
-
-        if check_custom_pipeline_valid(data["custom_pipeline"]) == "":
-            return False
-
-        if not check_output_path(data["output_dir"]):
-            return False
-        print("All inputs are good")
-        return True
 
     def format_bash_command(self, meshroom_batch: str, images: str, pipeline: str, to_node: str, save: str,
                             output: str) -> str:
@@ -258,18 +238,20 @@ class ProcessorGUI(QMainWindow):
 
     def make_bash_command(self, data: dict) -> str:
         ## Test if inputs are valid in get parameters
-        # if not self.test_if_inputs_valid(data):
+        # if not self.validate_inputs(data):
         #     return ""
 
         pipeline = check_custom_pipeline_valid(data["custom_pipeline"])
 
         name = os.path.basename(data["image_dir"])  ## get name based on input folder name
-        save_dir = os.path.join(data["work_dir"], name)
-        meshroom_batch = os.path.join(data["meshroom_dir"], "meshroom_batch")
+        save_path = os.path.join(data["work_dir"], name)
+        os.mkdir(save_path)
+        save_dir = os.path.join(save_path, f"{name}.mg")
 
+        meshroom_batch = os.path.join(data["meshroom_dir"], "meshroom_batch")
         to_node = data["to_node"]
         image_dir = data["image_dir"]
-        output_dir = data["output_dir"]
+        output_dir = os.path.join(data["output_dir"], name)
 
         command = self.format_bash_command(meshroom_batch, image_dir, pipeline, to_node, save_dir, output_dir)
 
@@ -284,7 +266,7 @@ class ProcessorGUI(QMainWindow):
         self.data["custom_pipeline"] = self.line_pipeline.text()
         self.data["to_node"] = self.line_to_node.text()
 
-        self.enable_start_btn()
+        self.validate_inputs()
 
     def set_parameters(self):
         self.line_meshroom_dir.setText(str(self.data["meshroom_dir"]))
@@ -294,19 +276,16 @@ class ProcessorGUI(QMainWindow):
         self.line_output_dir.setText(str(self.data["output_dir"]))
         self.line_to_node.setText(str(self.data["to_node"]))
 
-    def enable_start_btn(self):
-        if self.test_if_inputs_valid(self.data):
-            self.button_start.setEnabled(True)
-        else:
-            self.button_start.setEnabled(False)
-
     def start(self):
         # self.get_parameters()
+        self.save()
         command = self.make_bash_command(self.data)
         if command == "":
             print("Wrong data provided")
+            return
         else:
             print(command)
+            subprocess.run(command)
 
     def save(self):
         """
@@ -345,7 +324,7 @@ class ProcessorGUI(QMainWindow):
             #     "custom_pipeline": "",
             #     "output_dir": ""
             # }
-        self.enable_start_btn()
+        self.validate_inputs()
         self.set_parameters()
 
     def filter_data(self, data: dict) -> dict:
@@ -360,8 +339,11 @@ class ProcessorGUI(QMainWindow):
         }
         return filtered_data
 
-    def output_log(self):
-        pass
+    def open_output(self):
+        name = os.path.basename(self.data["image_dir"])
+        output_path = os.path.join(self.data["output_dir"], name)
+        os.startfile(output_path)
+
 
 
 def main():
