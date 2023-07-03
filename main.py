@@ -100,7 +100,7 @@ def count_images_in_directory(path: str) -> int:
 
 def check_custom_pipeline_valid(path: str) -> str:
     """
-    Checks if custom pipeline provided is a real meshroom graph file (.mg)
+    Checks if custom pipeline provided is a real meshroom graph file (.mg), or checks current directory for a .mg files
     :param path: pipeline file, meshroom graph template to use
     :return: valid template path
     """
