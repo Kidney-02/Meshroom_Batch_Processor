@@ -5,96 +5,23 @@
         "fileVersion": "1.1",
         "template": false,
         "nodesVersions": {
-            "Meshing": "7.0",
             "MeshFiltering": "3.0",
-            "SfMTransform": "3.1",
-            "DepthMapFilter": "3.0",
             "MeshResampling": "1.0",
-            "Publish": "1.3",
-            "FeatureMatching": "2.0",
-            "ImageMatching": "2.0",
-            "StructureFromMotion": "3.1",
+            "Texturing": "6.0",
             "CameraInit": "9.0",
             "DepthMap": "4.0",
-            "Texturing": "6.0",
             "PrepareDenseScene": "3.0",
-            "FeatureExtraction": "1.2"
+            "FeatureMatching": "2.0",
+            "Meshing": "7.0",
+            "SfMTransform": "3.1",
+            "FeatureExtraction": "1.2",
+            "DepthMapFilter": "3.0",
+            "StructureFromMotion": "3.1",
+            "Publish": "1.3",
+            "ImageMatching": "2.0"
         }
     },
     "graph": {
-        "Texturing_1": {
-            "nodeType": "Texturing",
-            "position": [
-                2197,
-                70
-            ],
-            "parallelization": {
-                "blockSize": 0,
-                "size": 1,
-                "split": 1
-            },
-            "uids": {
-                "0": "a13b8bd7d29de9380e86981bdc270f730d4ab4a5"
-            },
-            "internalFolder": "{cache}/{nodeType}/{uid0}/",
-            "inputs": {
-                "input": "{Meshing_1.output}",
-                "imagesFolder": "{DepthMap_1.imagesFolder}",
-                "inputMesh": "{MeshResampling_1.output}",
-                "inputRefMesh": "",
-                "textureSide": 2048,
-                "downscale": 2,
-                "outputMeshFileType": "obj",
-                "colorMapping": {
-                    "enable": true,
-                    "colorMappingFileType": "png"
-                },
-                "bumpMapping": {
-                    "enable": true,
-                    "bumpType": "Normal",
-                    "normalFileType": "exr",
-                    "heightFileType": "exr"
-                },
-                "displacementMapping": {
-                    "enable": true,
-                    "displacementMappingFileType": "exr"
-                },
-                "unwrapMethod": "Basic",
-                "useUDIM": true,
-                "fillHoles": false,
-                "padding": 5,
-                "multiBandDownscale": 4,
-                "multiBandNbContrib": {
-                    "high": 1,
-                    "midHigh": 5,
-                    "midLow": 10,
-                    "low": 0
-                },
-                "useScore": true,
-                "bestScoreThreshold": 0.1,
-                "angleHardThreshold": 90.0,
-                "workingColorSpace": "sRGB",
-                "outputColorSpace": "AUTO",
-                "correctEV": false,
-                "forceVisibleByAllVertices": false,
-                "flipNormals": false,
-                "visibilityRemappingMethod": "PullPush",
-                "subdivisionTargetRatio": 0.8,
-                "verboseLevel": "info"
-            },
-            "internalInputs": {
-                "invalidation": "",
-                "comment": "",
-                "label": "",
-                "color": ""
-            },
-            "outputs": {
-                "output": "{cache}/{nodeType}/{uid0}/",
-                "outputMesh": "{cache}/{nodeType}/{uid0}/texturedMesh.{outputMeshFileTypeValue}",
-                "outputMaterial": "{cache}/{nodeType}/{uid0}/texturedMesh.mtl",
-                "outputTextures": "{cache}/{nodeType}/{uid0}/texture_*.png"
-            }
-        },
         "Meshing_1": {
             "nodeType": "Meshing",
             "position": [
@@ -700,46 +627,11 @@
                 "outputViewsAndPoses": "{cache}/{nodeType}/{uid0}/cameras.sfm"
             }
         },
-        "MeshResampling_1": {
-            "nodeType": "MeshResampling",
-            "position": [
-                1910,
-                9
-            ],
-            "parallelization": {
-                "blockSize": 0,
-                "size": 1,
-                "split": 1
-            },
-            "uids": {
-                "0": "813a07c0c0e573c33ae9e92dade985b69fda01e4"
-            },
-            "internalFolder": "{cache}/{nodeType}/{uid0}/",
-            "inputs": {
-                "input": "{MeshFiltering_1.outputMesh}",
-                "simplificationFactor": 0.91,
-                "nbVertices": 0,
-                "minVertices": 0,
-                "maxVertices": 0,
-                "nbLloydIter": 1,
-                "flipNormals": true,
-                "verboseLevel": "info"
-            },
-            "internalInputs": {
-                "invalidation": "",
-                "comment": "",
-                "label": "",
-                "color": ""
-            },
-            "outputs": {
-                "output": "{cache}/{nodeType}/{uid0}/mesh.obj"
-            }
-        },
         "Publish_1": {
             "nodeType": "Publish",
             "position": [
-                2490,
-                67
+                2397,
+                116
             ],
             "parallelization": {
                 "blockSize": 0,
@@ -747,7 +639,7 @@
                 "split": 1
             },
             "uids": {
-                "0": "72a122acc9f437a8befd87f50693d2e6c58fdea7"
+                "0": "a848d94c4561c8b5433e1fa6024fa509edd32717"
             },
             "internalFolder": "{cache}/{nodeType}/{uid0}/",
             "inputs": {
@@ -764,6 +656,114 @@
                 "color": ""
             },
             "outputs": {}
+        },
+        "Texturing_1": {
+            "nodeType": "Texturing",
+            "position": [
+                2104,
+                119
+            ],
+            "parallelization": {
+                "blockSize": 0,
+                "size": 1,
+                "split": 1
+            },
+            "uids": {
+                "0": "1842430e015384fcd92b8b815f1bc67bdbcf2a81"
+            },
+            "internalFolder": "{cache}/{nodeType}/{uid0}/",
+            "inputs": {
+                "input": "{Meshing_1.output}",
+                "imagesFolder": "{DepthMap_1.imagesFolder}",
+                "inputMesh": "{MeshResampling_1.output}",
+                "inputRefMesh": "",
+                "textureSide": 2048,
+                "downscale": 2,
+                "outputMeshFileType": "obj",
+                "colorMapping": {
+                    "enable": true,
+                    "colorMappingFileType": "png"
+                },
+                "bumpMapping": {
+                    "enable": true,
+                    "bumpType": "Normal",
+                    "normalFileType": "exr",
+                    "heightFileType": "exr"
+                },
+                "displacementMapping": {
+                    "enable": true,
+                    "displacementMappingFileType": "exr"
+                },
+                "unwrapMethod": "Basic",
+                "useUDIM": true,
+                "fillHoles": false,
+                "padding": 5,
+                "multiBandDownscale": 4,
+                "multiBandNbContrib": {
+                    "high": 1,
+                    "midHigh": 5,
+                    "midLow": 10,
+                    "low": 0
+                },
+                "useScore": true,
+                "bestScoreThreshold": 0.1,
+                "angleHardThreshold": 90.0,
+                "workingColorSpace": "sRGB",
+                "outputColorSpace": "AUTO",
+                "correctEV": false,
+                "forceVisibleByAllVertices": false,
+                "flipNormals": false,
+                "visibilityRemappingMethod": "PullPush",
+                "subdivisionTargetRatio": 0.8,
+                "verboseLevel": "info"
+            },
+            "internalInputs": {
+                "invalidation": "",
+                "comment": "",
+                "label": "",
+                "color": ""
+            },
+            "outputs": {
+                "output": "{cache}/{nodeType}/{uid0}/",
+                "outputMesh": "{cache}/{nodeType}/{uid0}/texturedMesh.{outputMeshFileTypeValue}",
+                "outputMaterial": "{cache}/{nodeType}/{uid0}/texturedMesh.mtl",
+                "outputTextures": "{cache}/{nodeType}/{uid0}/texture_*.png"
+            }
+        },
+        "MeshResampling_1": {
+            "nodeType": "MeshResampling",
+            "position": [
+                1910,
+                9
+            ],
+            "parallelization": {
+                "blockSize": 0,
+                "size": 1,
+                "split": 1
+            },
+            "uids": {
+                "0": "717c6ea8b35390435c33fb33b7ce9374b2185f9b"
+            },
+            "internalFolder": "{cache}/{nodeType}/{uid0}/",
+            "inputs": {
+                "input": "{MeshFiltering_1.outputMesh}",
+                "simplificationFactor": 0.91,
+                "nbVertices": 0,
+                "minVertices": 0,
+                "maxVertices": 0,
+                "nbLloydIter": 1,
+                "flipNormals": false,
+                "verboseLevel": "info"
+            },
+            "internalInputs": {
+                "invalidation": "",
+                "comment": "",
+                "label": "",
+                "color": ""
+            },
+            "outputs": {
+                "output": "{cache}/{nodeType}/{uid0}/mesh.obj"
+            }
         }
     }
 }

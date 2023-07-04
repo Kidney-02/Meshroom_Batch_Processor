@@ -76,7 +76,7 @@ def count_images_in_directory(path: str) -> int:
                 count += 1
             except (IOError, SyntaxError):
                 pass
-    print(f"Image directory found. {count} images found")
+    print(f"Image directory  '{os.path.basename(path)}' found. {count} - images found")
     return count
 
 
@@ -114,7 +114,7 @@ def check_custom_pipeline_valid(path: str) -> str:
         print(f"No pipeline input, using template - {os.path.basename(path)}")
         return path
 
-
+## Replaced with get_pre_texturing_node
 def check_node(to_node: str, pipeline: str) -> bool:
     ## check if pipeline exists
     pipeline_file = check_custom_pipeline_valid(pipeline)
@@ -180,59 +180,7 @@ def find_ui_file() -> str:
         return ""
 
 
-def filter_data(data: dict) -> dict:
-    filtered_data = {
-        "meshroom_dir": data.get("meshroom_dir"),
-        "blender_dir": data.get("blender_dir"),
-        "image_dir": data.get("image_dir"),
-        "work_dir": data.get("work_dir"),
-        "custom_pipeline": data.get("custom_pipeline"),
-        "output_dir": data.get("output_dir"),
-        "to_node": data.get("to_node")
-    }
-    return filtered_data
 
-
-def make_bash_command(data: dict) -> str:
-    """
-    makes a bash command that runs meshroom_batch.exe
-    :param data: data to make command
-    :return:
-    """
-    pipeline = check_custom_pipeline_valid(data["custom_pipeline"])
-
-    name = os.path.basename(data["image_dir"])  ## get name based on input folder name
-    save_path = os.path.join(data["work_dir"], name)
-    ## Crashes if save_path already exists, should be prevented by validating
-    os.mkdir(save_path)
-    save_dir = os.path.join(save_path, f"{name}.mg")
-
-    meshroom_batch = os.path.join(data["meshroom_dir"], "meshroom_batch")
-    to_node = data["to_node"]
-    image_dir = data["image_dir"]
-    output_dir = os.path.join(data["output_dir"], name)
-
-    command = format_bash_command(meshroom_batch, image_dir, pipeline, to_node, save_dir, output_dir)
-
-    return command
-
-
-def format_bash_command(meshroom_batch: str, images: str, pipeline: str, to_node: str, save: str,
-                        output: str) -> str:
-    """
-    Formats the user inputs into a correct bash command
-    :param pipeline: custom meshroom pipeline
-    :param meshroom_batch: meshroom_batch.exe file to run
-    :param images: images path folder
-    :param to_node: the node to which to compile
-    :param save: save path
-    :param output: output path
-    :return:
-    """
-    ## Make BASH command
-    command = f"{meshroom_batch} --input {images} --pipeline {pipeline} --toNode {to_node} --save {save} --output {output}"
-
-    return command
 
 
 ##########################################################################################
@@ -363,9 +311,12 @@ class ProcessorGUI(QMainWindow):
         "work_dir": "",
         "output_dir": "",
         "custom_pipeline": "",
-        "to_node": "",
+        # "to_node": "",
     }
     data_file = "data.json"
+    custom_pipeline = ""
+    to_node = ""
+    current_dir = ""
 
     def __init__(self):
         super(ProcessorGUI, self).__init__(None)
@@ -388,7 +339,6 @@ class ProcessorGUI(QMainWindow):
         self.line_image_dir.returnPressed.connect(self.get_parameters)
         self.line_output_dir.returnPressed.connect(self.get_parameters)
         self.line_pipeline.returnPressed.connect(self.get_parameters)
-        self.line_to_node.returnPressed.connect(self.get_parameters)
 
     def validate_inputs(self) -> bool:
         ## Test if inputs are valid
@@ -406,7 +356,7 @@ class ProcessorGUI(QMainWindow):
             is_valid = False
         if count_images_in_directory(self.data["image_dir"]) <= 0:
             is_valid = False
-        if not check_node(self.data["to_node"], self.data["custom_pipeline"]):
+        if self.get_pre_texturing_node() == "":
             is_valid = False
 
         print("#" * 80)
@@ -426,7 +376,7 @@ class ProcessorGUI(QMainWindow):
         self.data["image_dir"] = self.line_image_dir.text()
         self.data["output_dir"] = self.line_output_dir.text()
         self.data["custom_pipeline"] = self.line_pipeline.text()
-        self.data["to_node"] = self.line_to_node.text()
+        # self.data["to_node"] = self.line_to_node.text()
 
         self.validate_inputs()
 
@@ -437,23 +387,165 @@ class ProcessorGUI(QMainWindow):
         self.line_image_dir.setText(str(self.data["image_dir"]))
         self.line_output_dir.setText(str(self.data["output_dir"]))
         self.line_pipeline.setText(str(self.data["custom_pipeline"]))
-        self.line_to_node.setText(str(self.data["to_node"]))
+        # self.line_to_node.setText(str(self.data["to_node"]))
+
+    def get_pre_texturing_node(self) -> str:
+
+        ## Read the template .mg file
+        pipeline_file = check_custom_pipeline_valid(self.data["custom_pipeline"])
+        if pipeline_file == "":
+            return ""
+        file = open(pipeline_file, "r")
+        json_data = file.read()
+        loaded_data = json.loads(json_data)
+
+        ## Get texturing node name
+        texturing_node = self.get_texturing_node_name(loaded_data)
+        if texturing_node == "":
+            return ""
+
+        ## Get texturing node inputMesh name
+        input_mesh_data = loaded_data['graph'][texturing_node]['inputs']['inputMesh']
+        to_node = input_mesh_data.strip("{}").split('_')[0]
+
+        print(f"Texturing inputMesh node is {to_node}")
+
+        self.custom_pipeline = pipeline_file
+        self.to_node = to_node
+        ## Return name
+        return to_node
+
+    def get_texturing_node_name(self, loaded_data: dict):
+        """
+        Needed because Texturing node can have a suffix
+        :param loaded_data:
+        :return:
+        """
+        texturing_node = next((key for key in loaded_data['graph'] if key.startswith('Texturing')), None)
+        if not texturing_node:
+            print("WARNING:", "No Texturing node found in graph")
+            return ""
+        return texturing_node
 
     def start(self):
         self.save()
-        command = make_bash_command(self.data)
+        ## validating in case something changed in folders between last validation and start
+        if not self.validate_inputs():
+            return
 
+        print("Meshing")
+        command = self.make_batch_command(self.data)
         print("Running:", command)
         subprocess.run(command)
 
         print("Mesh Created")
         name = self.get_name()
-        import_path = obj_import_path(self.data["work_dir"], name, self.data["to_node"])
+        import_path = obj_import_path(self.data["work_dir"], name, self.to_node)
         export_path = obj_export_path(self.data["work_dir"], name)
 
         print("Unwrapping")
         blender_unwrap(self.data["blender_dir"], import_path, export_path)
-        print("Unwrapped")
+
+        print("Texturing")
+        ## Edit save to use unwrapped Mesh
+        self.edit_graph_for_texturing(export_path)
+        # print("After edit")
+        command = self.make_compute_command(self.current_dir)
+        print(f"Running: {command}")
+        subprocess.run(command)
+
+        print("\n", f"Done with {os.path.basename(self.data['image_dir'])}")
+        self.rename_completed_image_dir(self.data['image_dir'])
+        print("#" * 80)
+
+    def make_batch_command(self, data: dict) -> str:
+        """
+        makes a bash command that runs meshroom_batch.exe
+        :param data: data to make command
+        :return:
+        """
+        # pipeline = check_custom_pipeline_valid(data["custom_pipeline"])
+        pipeline = self.custom_pipeline
+
+        name = self.get_name()
+        save_path = os.path.join(data["work_dir"], name)
+        ## Crashes if save_path already exists, should be prevented by validating
+        os.mkdir(save_path)
+        save_dir = os.path.join(save_path, f"{name}.mg")
+        self.current_dir = save_dir
+
+        meshroom_batch = os.path.join(data["meshroom_dir"], "meshroom_batch")
+        # to_node = data["to_node"]
+        to_node = self.to_node
+        image_dir = data["image_dir"]
+        output_dir = os.path.join(data["output_dir"], name)
+
+        # command = self.format_batch_command(meshroom_batch, image_dir, pipeline, to_node, save_dir, output_dir)
+        command = f"{meshroom_batch} --input {image_dir} --pipeline {pipeline} --toNode {to_node} --save {save_dir} --output {output_dir}"
+
+        return command
+
+    def make_compute_command(self, current_dir: str) -> str:
+        """
+        makes a bash command that runs meshroom_compute.exe to texture and output mesh
+        :return:
+        """
+        ## Get Meshroom_compute_exe
+        meshroom_compute = os.path.join(self.data["meshroom_dir"], "meshroom_compute")
+        print(meshroom_compute)
+        ## Get current Graph file
+        graph = current_dir
+        print(current_dir)
+
+        to_node = "Publish"
+        ## format command
+
+        return f"{meshroom_compute} {graph} --toNode {to_node}"
+
+    def compute(self):
+        image_name = os.path.basename(self.data["image_dir"])
+        graph_dir = os.path.join(self.data["work_dir"], image_name, image_name + ".mg")
+        print(self.make_compute_command(graph_dir))
+
+    def edit_graph_for_texturing(self, export_path: str):
+        ## load save.mg file
+        save_dir = self.current_dir
+        try:
+            with open(save_dir, "r") as file:
+                loaded_graph = json.load(file)
+        except (FileNotFoundError, json.JSONDecodeError):
+            print("WARNING:", f"Save file {os.path.basename(save_dir)}, not found")
+            return
+
+        ## find inputMesh key
+        texturing_node = self.get_texturing_node_name(loaded_graph)
+        if texturing_node == "":
+            return
+        ## replace inputMesh value with UnwrappedMesh
+
+        loaded_graph["graph"][texturing_node]["inputs"]["inputMesh"] = export_path
+
+        try:
+            with open(save_dir, "w") as file:
+                json.dump(loaded_graph, file, indent=4)
+            print(f"Texturing inputMesh replaced with {export_path}")
+        except IOError:
+            print("WARNING:", "An error occurred while writing the modified data to the file.")
+
+    def rename_completed_image_dir(self, completed_path: str):
+        """
+        run this after finishing a photoscan, adds a . to the image folder to track it as ignored
+        :return:
+        """
+        # Specify the directory path
+
+        # Extract the folder name from the directory path
+        folder_name = os.path.basename(completed_path)
+        new_folder_name = '.' + folder_name
+        new_path = completed_path.replace(folder_name, new_folder_name)
+
+        # Rename the directory
+        os.rename(completed_path, new_path)
 
     def save(self):
         """
@@ -462,7 +554,7 @@ class ProcessorGUI(QMainWindow):
         """
         self.get_parameters()
 
-        filtered_data = filter_data(self.data)
+        filtered_data = self.filter_data(self.data)
         json_file = open(self.data_file, "w")
         json.dump(filtered_data, json_file, indent=4)
         json_file.close()
@@ -472,7 +564,7 @@ class ProcessorGUI(QMainWindow):
             with open(self.data_file, "r") as file:
                 json_data = file.read()
             loaded_data = json.loads(json_data)
-            self.data = filter_data(loaded_data)
+            self.data = self.filter_data(loaded_data)
         except (FileNotFoundError, json.JSONDecodeError):
             print("Data file invalid or missing, initializing without data")
             # Set empty strings for each key if the file is not found or is invalid JSON
@@ -492,6 +584,18 @@ class ProcessorGUI(QMainWindow):
         self.validate_inputs()
         self.set_parameters()
 
+    def filter_data(self, data: dict) -> dict:
+        filtered_data = {
+            "meshroom_dir": data.get("meshroom_dir"),
+            "blender_dir": data.get("blender_dir"),
+            "image_dir": data.get("image_dir"),
+            "work_dir": data.get("work_dir"),
+            "custom_pipeline": data.get("custom_pipeline"),
+            "output_dir": data.get("output_dir"),
+            # "to_node": data.get("to_node")
+        }
+        return filtered_data
+
     def info(self):
         print("INFO:", "Explanation, or link to github, idk")
 
@@ -501,7 +605,6 @@ class ProcessorGUI(QMainWindow):
 
 def main():
     app = QApplication([])
-
     window = ProcessorGUI()
     app.exec_()
 
