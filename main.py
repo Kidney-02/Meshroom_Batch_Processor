@@ -58,85 +58,8 @@ def check_meshroom_batch_exists(path: str) -> bool:
         return False
 
 
-def count_images_in_directory(path: str) -> int:
-    """
-    Counts number of images in provided directory
-    :param path: images directory
-    :return:
-    """
-    if not check_directory_exists(path):
-        print("WARNING:", "Images directory not valid")
-        return -1
-    count = 0
-    for filename in os.listdir(path):
-        file_path = os.path.join(path, filename)
-        if os.path.isfile(file_path):
-            try:
-                Image.open(file_path)
-                count += 1
-            except (IOError, SyntaxError):
-                pass
-    print(f"Image directory  '{os.path.basename(path)}' found. {count} - images found")
-    return count
 
 
-def check_custom_pipeline_valid(path: str) -> str:
-    """
-    Checks if custom pipeline provided is a real meshroom graph file, or checks current directory for .mg files
-    :param path: pipeline file, meshroom graph template to use
-    :return: valid template path
-    """
-    ## First check if input path is empty,
-    ## if not empty check if path is valid
-    if path != "":
-        if not os.path.exists(path):
-            print("WARNING:", "Pipeline path input wrong")
-            return ""
-        if os.path.isdir(path):
-            print("WARNING:", "Pipeline path  input is a folder, meshroom graph file expected")
-            return ""
-        _, ext = os.path.splitext(path)  ## splits path from its extension
-        if ext == ".mg":
-            return path
-
-    ## Second if no path is given, check in current working directory for file with .mg extension
-    cwd = os.getcwd()
-    has_template_pipeline = False
-    for file in os.listdir(cwd):
-        if file.endswith(".mg"):
-            path = file
-            has_template_pipeline = True
-    ## If .mg file in script directory doesn't exist print warning
-    if not has_template_pipeline:
-        print("WARNING:", "No pipeline input, template not found")
-        return ""
-    else:
-        print(f"No pipeline input, using template - {os.path.basename(path)}")
-        return path
-
-## Replaced with get_pre_texturing_node
-def check_node(to_node: str, pipeline: str) -> bool:
-    ## check if pipeline exists
-    pipeline_file = check_custom_pipeline_valid(pipeline)
-    if pipeline_file == "":
-        return False
-
-    ## check if node exists in pipeline?
-    file = open(pipeline_file, "r")
-    json_data = file.read()
-    loaded_data = json.loads(json_data)
-
-    # Get the keys from the 'nodesVersions' dictionary
-    node_versions = loaded_data["header"]["nodesVersions"]
-    keys = node_versions.keys()
-
-    # Check if the given node is one of the keys
-    if to_node in keys:
-        # print(f"Node '{to_node}' found in '{pipeline_file}'")
-        return True
-    else:
-        print("WARNING:", f"Node '{to_node}' not found in '{pipeline_file}'")
-        return False
 
 
 def check_task_path(path: str, name: str, task: str = "") -> bool:
@@ -160,26 +83,6 @@ def check_task_path(path: str, name: str, task: str = "") -> bool:
         return False
 
     return True
-
-
-def find_ui_file() -> str:
-    # Get the current working directory
-    cwd = os.getcwd()
-
-    # Get a list of files in the directory
-    files = os.listdir(cwd)
-
-    # Find the first file ending with ".ui"
-    ui_file = next((file for file in files if file.endswith(".ui")), None)
-
-    if ui_file is not None:
-        return ui_file
-
-    else:
-        print(".ui file not found")
-        return ""
-
-
 
 
 
@@ -318,12 +221,15 @@ class ProcessorGUI(QMainWindow):
     to_node = ""
     current_dir = ""
 
+    galleries = {}
+
     def __init__(self):
         super(ProcessorGUI, self).__init__(None)
-        uic.loadUi(find_ui_file(), self)
+        uic.loadUi(self.find_ui_file(), self)
         self.setFixedSize(self.size().width(), self.size().height())
         self.show()
         self.load()
+        self.get_image_folders()
 
         ## Buttons
         self.button_save.clicked.connect(self.save)
@@ -340,6 +246,20 @@ class ProcessorGUI(QMainWindow):
         self.line_output_dir.returnPressed.connect(self.get_parameters)
         self.line_pipeline.returnPressed.connect(self.get_parameters)
 
+    def find_ui_file(self) -> str:
+        # Get the current working directory
+        cwd = os.getcwd()
+        # Get a list of files in the directory
+        files = os.listdir(cwd)
+        # Find the first file ending with ".ui"
+        ui_file = next((file for file in files if file.endswith(".ui")), None)
+
+        if ui_file is not None:
+            return ui_file
+        else:
+            print(".ui file not found")
+            return ""
+
     def validate_inputs(self) -> bool:
         ## Test if inputs are valid
         is_valid = True
@@ -354,10 +274,12 @@ class ProcessorGUI(QMainWindow):
             is_valid = False
         if not check_task_path(self.data["output_dir"], name, "output"):
             is_valid = False
-        if count_images_in_directory(self.data["image_dir"]) <= 0:
+        if self.count_images_in_directory(self.data["image_dir"]) <= 0:
             is_valid = False
         if self.get_pre_texturing_node() == "":
             is_valid = False
+
+        self.get_image_folders()
 
         print("#" * 80)
 
@@ -389,10 +311,47 @@ class ProcessorGUI(QMainWindow):
         self.line_pipeline.setText(str(self.data["custom_pipeline"]))
         # self.line_to_node.setText(str(self.data["to_node"]))
 
-    def get_pre_texturing_node(self) -> str:
+    def check_custom_pipeline(self, path: str) -> str:
+        """
+        Checks if custom pipeline provided is a real meshroom graph file, or checks current directory for .mg files
+        :param path: pipeline file, meshroom graph template to use
+        :return: valid template path
+        """
+        ## First check if input path is empty,
+        ## if not empty check if path is valid
+        if path != "":
+            if not os.path.exists(path):
+                print("WARNING:", "Pipeline path input wrong")
+                return ""
+            if os.path.isdir(path):
+                print("WARNING:", "Pipeline path  input is a folder, meshroom graph file expected")
+                return ""
+            _, ext = os.path.splitext(path)  ## splits path from its extension
+            if ext == ".mg":
+                return path
 
+        ## Second if no path is given, check in current working directory for file with .mg extension
+        cwd = os.getcwd()
+        has_template_pipeline = False
+        for file in os.listdir(cwd):
+            if file.endswith(".mg"):
+                path = file
+                has_template_pipeline = True
+        ## If .mg file in script directory doesn't exist print warning
+        if not has_template_pipeline:
+            print("WARNING:", "No pipeline input, template not found")
+            return ""
+        else:
+            print(f"No pipeline input, using template - {os.path.basename(path)}")
+            return path
+
+    def get_pre_texturing_node(self) -> str:
+        """
+        gets the node that texturing node uses as inputMesh
+        :return: node name
+        """
         ## Read the template .mg file
-        pipeline_file = check_custom_pipeline_valid(self.data["custom_pipeline"])
+        pipeline_file = self.check_custom_pipeline(self.data["custom_pipeline"])
         if pipeline_file == "":
             return ""
         file = open(pipeline_file, "r")
@@ -417,7 +376,7 @@ class ProcessorGUI(QMainWindow):
 
     def get_texturing_node_name(self, loaded_data: dict):
         """
-        Needed because Texturing node can have a suffix
+        get full name of texturing node including suffix
         :param loaded_data:
         :return:
         """
@@ -429,6 +388,15 @@ class ProcessorGUI(QMainWindow):
 
     def start(self):
         self.save()
+        self.single_obj_remesh("temp")
+        pass
+
+    def single_obj_remesh(self, name: str):
+        """
+        performs remesh of a single image gallery
+        :param name: name of gallery to be meshed
+        :return:
+        """
         ## validating in case something changed in folders between last validation and start
         if not self.validate_inputs():
             return
@@ -502,11 +470,6 @@ class ProcessorGUI(QMainWindow):
 
         return f"{meshroom_compute} {graph} --toNode {to_node}"
 
-    def compute(self):
-        image_name = os.path.basename(self.data["image_dir"])
-        graph_dir = os.path.join(self.data["work_dir"], image_name, image_name + ".mg")
-        print(self.make_compute_command(graph_dir))
-
     def edit_graph_for_texturing(self, export_path: str):
         ## load save.mg file
         save_dir = self.current_dir
@@ -546,6 +509,50 @@ class ProcessorGUI(QMainWindow):
 
         # Rename the directory
         os.rename(completed_path, new_path)
+
+    def get_image_folders(self):
+        path = self.data["image_dir"]
+        try:
+            image_dirs = [directory for directory in os.listdir(path) if os.path.isdir(os.path.join(path, directory))]
+        except OSError:
+            print("WARNING:", "Error occurred getting image directories")
+            return
+
+        for d in image_dirs:
+            print(d)
+            name = os.path.basename(d)
+            count = self.count_images_in_directory(os.path.join(path, d))
+            self.galleries[name] = count
+
+        self.list_galleries()
+
+        return image_dirs
+
+    def count_images_in_directory(self, path: str) -> int:
+        """
+        Counts number of images in provided directory
+        :param path: images directory
+        :return:
+        """
+        if not check_directory_exists(path):
+            print("WARNING:", "Images directory not valid")
+            return -1
+        count = 0
+        for filename in os.listdir(path):
+            file_path = os.path.join(path, filename)
+            if os.path.isfile(file_path):
+                try:
+                    Image.open(file_path)
+                    count += 1
+                except (IOError, SyntaxError):
+                    pass
+        print(f"Image directory  '{os.path.basename(path)}' found. {count} - images found")
+        return count
+
+    def list_galleries(self):
+        self.list_image_dirs.clear()
+        for name, value in self.galleries.items():
+            self.list_image_dirs.addItem(f"{name}:    {value}")
 
     def save(self):
         """
