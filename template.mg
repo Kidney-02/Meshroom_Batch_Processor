@@ -5,28 +5,28 @@
         "fileVersion": "1.1",
         "template": false,
         "nodesVersions": {
-            "MeshFiltering": "3.0",
-            "MeshResampling": "1.0",
-            "Texturing": "6.0",
+            "Meshing": "7.0",
+            "FeatureExtraction": "1.2",
             "CameraInit": "9.0",
+            "StructureFromMotion": "3.1",
+            "Texturing": "6.0",
+            "MeshFiltering": "3.0",
+            "ImageMatching": "2.0",
+            "SfMTransform": "3.1",
+            "Publish": "1.3",
+            "MeshResampling": "1.0",
+            "DepthMapFilter": "3.0",
             "DepthMap": "4.0",
             "PrepareDenseScene": "3.0",
-            "FeatureMatching": "2.0",
-            "Meshing": "7.0",
-            "SfMTransform": "3.1",
-            "FeatureExtraction": "1.2",
-            "DepthMapFilter": "3.0",
-            "StructureFromMotion": "3.1",
-            "Publish": "1.3",
-            "ImageMatching": "2.0"
+            "FeatureMatching": "2.0"
         }
     },
     "graph": {
         "Meshing_1": {
             "nodeType": "Meshing",
             "position": [
-                1507,
-                10
+                1408,
+                -22
             ],
             "parallelization": {
                 "blockSize": 0,
@@ -114,8 +114,8 @@
         "DepthMapFilter_1": {
             "nodeType": "DepthMapFilter",
             "position": [
-                1307,
-                10
+                1208,
+                -22
             ],
             "parallelization": {
                 "blockSize": 10,
@@ -301,8 +301,8 @@
         "PrepareDenseScene_1": {
             "nodeType": "PrepareDenseScene",
             "position": [
-                907,
-                10
+                808,
+                -22
             ],
             "parallelization": {
                 "blockSize": 40,
@@ -388,8 +388,8 @@
         "DepthMap_1": {
             "nodeType": "DepthMap",
             "position": [
-                1107,
-                10
+                1008,
+                -22
             ],
             "parallelization": {
                 "blockSize": 3,
@@ -488,8 +488,8 @@
         "MeshFiltering_1": {
             "nodeType": "MeshFiltering",
             "position": [
-                1707,
-                10
+                1608,
+                -22
             ],
             "parallelization": {
                 "blockSize": 0,
@@ -497,7 +497,7 @@
                 "split": 1
             },
             "uids": {
-                "0": "fb6a2d16bccd056cdbafee2497d5470ca8a3a7f4"
+                "0": "fa68bf0207b87f6cba6da225b4b4e1f64da54820"
             },
             "internalFolder": "{cache}/{nodeType}/{uid0}/",
             "inputs": {
@@ -506,7 +506,7 @@
                 "keepLargestMeshOnly": true,
                 "smoothingSubset": "all",
                 "smoothingBoundariesNeighbours": 0,
-                "smoothingIterations": 0,
+                "smoothingIterations": 2,
                 "smoothingLambda": 1.0,
                 "filteringSubset": "all",
                 "filteringIterations": 1,
@@ -573,8 +573,8 @@
         "SfMTransform_1": {
             "nodeType": "SfMTransform",
             "position": [
-                626,
-                -68
+                587,
+                -122
             ],
             "parallelization": {
                 "blockSize": 0,
@@ -630,8 +630,8 @@
         "Publish_1": {
             "nodeType": "Publish",
             "position": [
-                2397,
-                116
+                2013,
+                87
             ],
             "parallelization": {
                 "blockSize": 0,
@@ -639,7 +639,7 @@
                 "split": 1
             },
             "uids": {
-                "0": "a848d94c4561c8b5433e1fa6024fa509edd32717"
+                "0": "39a5c5030f7700526f2b725fc5de36c91935554c"
             },
             "internalFolder": "{cache}/{nodeType}/{uid0}/",
             "inputs": {
@@ -660,8 +660,8 @@
         "Texturing_1": {
             "nodeType": "Texturing",
             "position": [
-                2104,
-                119
+                1812,
+                86
             ],
             "parallelization": {
                 "blockSize": 0,
@@ -669,13 +669,13 @@
                 "split": 1
             },
             "uids": {
-                "0": "1842430e015384fcd92b8b815f1bc67bdbcf2a81"
+                "0": "53db6d4f9ac2400fa59f0844584b888a171bc1fd"
             },
             "internalFolder": "{cache}/{nodeType}/{uid0}/",
             "inputs": {
                 "input": "{Meshing_1.output}",
                 "imagesFolder": "{DepthMap_1.imagesFolder}",
-                "inputMesh": "{MeshResampling_1.output}",
+                "inputMesh": "{MeshFiltering_1.outputMesh}",
                 "inputRefMesh": "",
                 "textureSide": 2048,
                 "downscale": 2,
@@ -696,7 +696,7 @@
                 },
                 "unwrapMethod": "Basic",
                 "useUDIM": true,
-                "fillHoles": false,
+                "fillHoles": true,
                 "padding": 5,
                 "multiBandDownscale": 4,
                 "multiBandNbContrib": {
@@ -709,7 +709,7 @@
                 "bestScoreThreshold": 0.1,
                 "angleHardThreshold": 90.0,
                 "workingColorSpace": "sRGB",
-                "outputColorSpace": "AUTO",
+                "outputColorSpace": "sRGB",
                 "correctEV": false,
                 "forceVisibleByAllVertices": false,
                 "flipNormals": false,
@@ -733,8 +733,8 @@
         "MeshResampling_1": {
             "nodeType": "MeshResampling",
             "position": [
-                1910,
-                9
+                1811,
+                -23
             ],
             "parallelization": {
                 "blockSize": 0,
@@ -742,7 +742,7 @@
                 "split": 1
             },
             "uids": {
-                "0": "717c6ea8b35390435c33fb33b7ce9374b2185f9b"
+                "0": "3609fec0aa2bd01e55b021e90147d15a40f58bd6"
             },
             "internalFolder": "{cache}/{nodeType}/{uid0}/",
             "inputs": {

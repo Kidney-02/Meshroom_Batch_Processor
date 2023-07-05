@@ -1,9 +1,9 @@
-from PIL import Image
 import subprocess
 import os
-from PyQt5.QtWidgets import *
-from PyQt5 import uic
 import json
+from PyQt5.QtWidgets import QMainWindow, QHeaderView, QTableWidgetItem, QApplication
+from PyQt5 import uic
+from PIL import Image
 
 
 #################################################
@@ -24,20 +24,6 @@ def check_directory_exists(path: str):
         return False
     return True
 
-
-def check_directory_empty(path: str) -> int:
-    """
-    checks if given directory is empty
-    :param path:
-    :return:
-    """
-    if not check_directory_exists(path):
-        return 1  ## does not exist
-
-    ## check if empty
-    return 2 if len(os.listdir(path)) != 0 else 0  ## return 0 if empty and 2 if not empty
-
-
 def check_meshroom_batch_exists(path: str) -> bool:
     """
     Takes meshroom_batch path and checks if it exists or not
@@ -56,11 +42,6 @@ def check_meshroom_batch_exists(path: str) -> bool:
     else:
         print("WARNING:", "Meshroom directory doesn't contain 'meshroom_batch.exe'")
         return False
-
-
-
-
-
 
 def check_task_path(path: str, name: str, task: str = "") -> bool:
     ## Needs to check if folder with image name exists to validate
@@ -83,7 +64,6 @@ def check_task_path(path: str, name: str, task: str = "") -> bool:
         return False
 
     return True
-
 
 
 ##########################################################################################
@@ -124,12 +104,12 @@ bpy.context.view_layer.objects.active = obj
 bpy.ops.object.mode_set(mode='EDIT')
 
 ## Perform UV unwrapping
-bpy.ops.uv.smart_project()
+bpy.ops.uv.smart_project(island_margin=0.002)
 
 ## Pack UV islands
 bpy.ops.uv.select_all(action='SELECT')
 ########################################################################
-##### Disabled until pack_islands is fixed in blender3.6 hopefully #####
+##### Disabled until pack_islands is fixed in blender3.6.1 hopefully #####
 # bpy.ops.uv.pack_islands()
 ########################################################################
 
@@ -219,7 +199,7 @@ class ProcessorGUI(QMainWindow):
     data_file = "data.json"
     custom_pipeline = ""
     to_node = ""
-    current_dir = ""
+    current_cache = ""
 
     galleries = {}
 
@@ -229,7 +209,6 @@ class ProcessorGUI(QMainWindow):
         self.setFixedSize(self.size().width(), self.size().height())
         self.show()
         self.load()
-        self.get_image_folders()
 
         ## Buttons
         self.button_save.clicked.connect(self.save)
@@ -238,7 +217,13 @@ class ProcessorGUI(QMainWindow):
         self.button_validate.clicked.connect(self.validate_inputs)
         self.button_info.clicked.connect(self.info)
 
-        ## Check Inputs
+        ## Table
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.Fixed)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.resizeSection(0, 420)
+
+        ## Inputs
         self.line_meshroom_dir.returnPressed.connect(self.get_parameters)
         self.line_blender_dir.returnPressed.connect(self.get_parameters)
         self.line_work_dir.returnPressed.connect(self.get_parameters)
@@ -274,12 +259,11 @@ class ProcessorGUI(QMainWindow):
             is_valid = False
         if not check_task_path(self.data["output_dir"], name, "output"):
             is_valid = False
-        if self.count_images_in_directory(self.data["image_dir"]) <= 0:
+        if self.get_image_folders() <= 0:
             is_valid = False
         if self.get_pre_texturing_node() == "":
             is_valid = False
 
-        self.get_image_folders()
 
         print("#" * 80)
 
@@ -388,26 +372,41 @@ class ProcessorGUI(QMainWindow):
 
     def start(self):
         self.save()
-        self.single_obj_remesh("temp")
-        pass
+        ## Loop over every input image folder and make a mesh for each
+        total_galleries = len(self.galleries)
+        print(total_galleries)
 
-    def single_obj_remesh(self, name: str):
+        ## validating in case something changed in folders between last validation and start
+        # if not self.validate_inputs():
+        #     return
+
+        for name in self.galleries:
+            print(f"Processing {name}")
+            self.single_obj_meshing(name)
+        print("Processing finished")
+        self.validate_inputs()
+
+    def single_obj_meshing(self, name: str):
         """
         performs remesh of a single image gallery
         :param name: name of gallery to be meshed
         :return:
         """
-        ## validating in case something changed in folders between last validation and start
-        if not self.validate_inputs():
-            return
+    
+        ## Same data, but with image dirs replaced with current gallery
+        single_obj_data = self.data.copy()
+        gallery_path = os.path.join(self.data["image_dir"], name)
+        print(self.data["image_dir"])
+        print(f"Current Image Directory: {gallery_path}")
+        single_obj_data["image_dir"] = gallery_path
 
         print("Meshing")
-        command = self.make_batch_command(self.data)
+        command = self.make_batch_command(single_obj_data)
         print("Running:", command)
         subprocess.run(command)
 
         print("Mesh Created")
-        name = self.get_name()
+        # name = self.get_name()
         import_path = obj_import_path(self.data["work_dir"], name, self.to_node)
         export_path = obj_export_path(self.data["work_dir"], name)
 
@@ -418,12 +417,12 @@ class ProcessorGUI(QMainWindow):
         ## Edit save to use unwrapped Mesh
         self.edit_graph_for_texturing(export_path)
         # print("After edit")
-        command = self.make_compute_command(self.current_dir)
+        command = self.make_compute_command(self.current_cache)
         print(f"Running: {command}")
         subprocess.run(command)
 
-        print("\n", f"Done with {os.path.basename(self.data['image_dir'])}")
-        self.rename_completed_image_dir(self.data['image_dir'])
+        print("\n", f"Done with {name}")
+        self.rename_completed_image_dir(gallery_path)
         print("#" * 80)
 
     def make_batch_command(self, data: dict) -> str:
@@ -440,7 +439,7 @@ class ProcessorGUI(QMainWindow):
         ## Crashes if save_path already exists, should be prevented by validating
         os.mkdir(save_path)
         save_dir = os.path.join(save_path, f"{name}.mg")
-        self.current_dir = save_dir
+        self.current_cache = save_dir
 
         meshroom_batch = os.path.join(data["meshroom_dir"], "meshroom_batch")
         # to_node = data["to_node"]
@@ -453,7 +452,7 @@ class ProcessorGUI(QMainWindow):
 
         return command
 
-    def make_compute_command(self, current_dir: str) -> str:
+    def make_compute_command(self, current_cache: str) -> str:
         """
         makes a bash command that runs meshroom_compute.exe to texture and output mesh
         :return:
@@ -462,8 +461,8 @@ class ProcessorGUI(QMainWindow):
         meshroom_compute = os.path.join(self.data["meshroom_dir"], "meshroom_compute")
         print(meshroom_compute)
         ## Get current Graph file
-        graph = current_dir
-        print(current_dir)
+        graph = current_cache
+        print(current_cache)
 
         to_node = "Publish"
         ## format command
@@ -472,7 +471,7 @@ class ProcessorGUI(QMainWindow):
 
     def edit_graph_for_texturing(self, export_path: str):
         ## load save.mg file
-        save_dir = self.current_dir
+        save_dir = self.current_cache
         try:
             with open(save_dir, "r") as file:
                 loaded_graph = json.load(file)
@@ -510,23 +509,36 @@ class ProcessorGUI(QMainWindow):
         # Rename the directory
         os.rename(completed_path, new_path)
 
-    def get_image_folders(self):
+    def get_image_folders(self) -> int:
         path = self.data["image_dir"]
         try:
             image_dirs = [directory for directory in os.listdir(path) if os.path.isdir(os.path.join(path, directory))]
         except OSError:
             print("WARNING:", "Error occurred getting image directories")
-            return
+            return -1
 
+        self.galleries.clear()
+
+        ## Count the images in given directories
         for d in image_dirs:
-            print(d)
+            ## Filter out the ones that start with .
+            if d.startswith("."):
+                continue
+            # print(d)
             name = os.path.basename(d)
             count = self.count_images_in_directory(os.path.join(path, d))
+            ## Remove ones with 0 images
+            if count <= 0:
+                continue
             self.galleries[name] = count
 
+        galleries = len(self.galleries)
+
+        if galleries <= 0:
+            print("WARNING:", "No image galleries found in image directory")
         self.list_galleries()
 
-        return image_dirs
+        return galleries
 
     def count_images_in_directory(self, path: str) -> int:
         """
@@ -550,9 +562,15 @@ class ProcessorGUI(QMainWindow):
         return count
 
     def list_galleries(self):
-        self.list_image_dirs.clear()
-        for name, value in self.galleries.items():
-            self.list_image_dirs.addItem(f"{name}:    {value}")
+        self.table.clearContents()
+        self.table.setRowCount(0)
+        self.table.setRowCount(len(self.galleries))
+        for row, (name, value) in enumerate(self.galleries.items()):
+            name_item = QTableWidgetItem(name)
+            value_item = QTableWidgetItem(str(value))
+            self.table.setItem(row, 0, name_item)
+            self.table.setItem(row, 1, value_item)
+
 
     def save(self):
         """
