@@ -1,5 +1,6 @@
 import subprocess
 import os
+import glob
 import json
 from PyQt5.QtWidgets import QMainWindow, QHeaderView, QTableWidgetItem, QApplication
 from PyQt5 import uic
@@ -24,6 +25,10 @@ def check_directory_exists(path: str):
         return False
     return True
 
+def find_file_in_path(path: str, file_name: str) -> bool:
+    files = os.listdir(path)
+    return any(file.startswith(file_name) for file in files)
+
 def check_meshroom_batch_exists(path: str) -> bool:
     """
     Takes meshroom_batch path and checks if it exists or not
@@ -34,13 +39,14 @@ def check_meshroom_batch_exists(path: str) -> bool:
         print("WARNING:", "Meshroom directory is wrong")
         return False
 
-    meshroom_batch = os.path.join(path, "meshroom_batch.exe")
-    test = os.path.isfile(meshroom_batch)
-    if test:
+    # meshroom_batch = os.path.join(path, "meshroom_batch.exe")
+    # test = os.path.isfile(meshroom_batch)
+
+    if find_file_in_path(path, "meshroom_batch"):
         # print("Meshroom_batch found")
         return True
     else:
-        print("WARNING:", "Meshroom directory doesn't contain 'meshroom_batch.exe'")
+        print("WARNING:", "Meshroom directory doesn't contain 'meshroom_batch'")
         return False
 
 def check_task_path(path: str, name: str, task: str = "") -> bool:
@@ -78,7 +84,7 @@ def blender_unwrap(blender_dir: str, import_path: str, export_path: str):
     :param export_path:
     :return:
     """
-    blender_exe = os.path.join(blender_dir, "blender.exe")
+    blender_exe = os.path.join(blender_dir, "blender")
     # Start Blender process
     blender_cmd = [f"{blender_exe}", "--background"]
     subprocess.run(blender_cmd)
@@ -132,9 +138,9 @@ def check_blender_exe_exists(path: str) -> bool:
         print("WARNING:", "Blender directory is wrong")
         return False
 
-    blender_exe = os.path.join(path, "blender.exe")
-    test = os.path.isfile(blender_exe)
-    if test:
+    # blender_exe = os.path.join(path, "blender.exe")
+    # test = os.path.isfile(blender_exe)
+    if find_file_in_path(path, "blender"):
         # print("Blender.exe found")
         return True
     else:
@@ -224,12 +230,18 @@ class ProcessorGUI(QMainWindow):
         header.resizeSection(0, 420)
 
         ## Inputs
-        self.line_meshroom_dir.returnPressed.connect(self.get_parameters)
-        self.line_blender_dir.returnPressed.connect(self.get_parameters)
-        self.line_work_dir.returnPressed.connect(self.get_parameters)
-        self.line_image_dir.returnPressed.connect(self.get_parameters)
-        self.line_output_dir.returnPressed.connect(self.get_parameters)
-        self.line_pipeline.returnPressed.connect(self.get_parameters)
+        text_fields = [
+            self.line_meshroom_dir,
+            self.line_blender_dir,
+            self.line_work_dir,
+            self.line_image_dir,
+            self.line_output_dir,
+            self.line_pipeline,
+        ]
+
+        for line in text_fields:
+            line.textEdited.connect(self.get_parameters)
+            line.returnPressed.connect(self.validate_inputs)
 
     def find_ui_file(self) -> str:
         # Get the current working directory
@@ -247,8 +259,8 @@ class ProcessorGUI(QMainWindow):
 
     def validate_inputs(self) -> bool:
         ## Test if inputs are valid
-        is_valid = True
 
+        is_valid = True
         name = self.get_name()
         print("#" * 80)
         if not check_meshroom_batch_exists(self.data["meshroom_dir"]):
@@ -282,9 +294,7 @@ class ProcessorGUI(QMainWindow):
         self.data["image_dir"] = self.line_image_dir.text()
         self.data["output_dir"] = self.line_output_dir.text()
         self.data["custom_pipeline"] = self.line_pipeline.text()
-        # self.data["to_node"] = self.line_to_node.text()
 
-        self.validate_inputs()
 
     def set_parameters(self):
         self.line_meshroom_dir.setText(str(self.data["meshroom_dir"]))
@@ -293,7 +303,6 @@ class ProcessorGUI(QMainWindow):
         self.line_image_dir.setText(str(self.data["image_dir"]))
         self.line_output_dir.setText(str(self.data["output_dir"]))
         self.line_pipeline.setText(str(self.data["custom_pipeline"]))
-        # self.line_to_node.setText(str(self.data["to_node"]))
 
     def check_custom_pipeline(self, path: str) -> str:
         """
@@ -426,10 +435,10 @@ class ProcessorGUI(QMainWindow):
         self.rename_completed_image_dir(gallery_path)
         print("#" * 80)
 
-
     def make_batch_command(self, data: dict, name: str) -> str:
         """
         makes a bash command that runs meshroom_batch.exe
+        :param name:
         :param data: data to make command
         :return:
         """
@@ -572,7 +581,6 @@ class ProcessorGUI(QMainWindow):
             value_item = QTableWidgetItem(str(value))
             self.table.setItem(row, 0, name_item)
             self.table.setItem(row, 1, value_item)
-
 
     def save(self):
         """
