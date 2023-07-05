@@ -401,18 +401,22 @@ class ProcessorGUI(QMainWindow):
         :param name: name of gallery to be meshed
         :return:
         """
-    
+        print("self.data.copy(): ", self.data.copy())
         ## Same data, but with image dirs replaced with current gallery
         single_obj_data = self.data.copy()
+        print("single object data ", single_obj_data)
         gallery_path = os.path.join(self.data["image_dir"], name)
-        print("Main image directory: ", self.data["image_dir"])
+        print("Main iamge directory: ", self.data["image_dir"])
         print(f"Current Image Directory: {gallery_path}")
         single_obj_data["image_dir"] = gallery_path
 
         print("Meshing")
         command = self.make_batch_command(single_obj_data, name)
         print("Running:", command)
-        subprocess.run(command)
+        subprocess.run(command, shell=True)
+
+        exit()
+
 
         print("Mesh Created")
         # name = self.get_name()
@@ -428,7 +432,7 @@ class ProcessorGUI(QMainWindow):
         # print("After edit")
         command = self.make_compute_command(self.current_cache)
         print(f"Running: {command}")
-        subprocess.run(command)
+        subprocess.run(command, shell=True)
 
 
         print("\n", f"Done with {name}")
@@ -473,7 +477,10 @@ class ProcessorGUI(QMainWindow):
         print(meshroom_compute)
         ## Get current Graph file
         graph = current_cache
+        print("Current cache:")
         print(current_cache)
+        print("Graph:")
+        print(graph)
 
         to_node = "Publish"
         ## format command
