@@ -506,7 +506,7 @@
                 "keepLargestMeshOnly": true,
                 "smoothingSubset": "all",
                 "smoothingBoundariesNeighbours": 0,
-                "smoothingIterations": 2,
+                "smoothingIterations": 5,
                 "smoothingLambda": 1.0,
                 "filteringSubset": "all",
                 "filteringIterations": 1,

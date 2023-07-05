@@ -396,22 +396,22 @@ class ProcessorGUI(QMainWindow):
         ## Same data, but with image dirs replaced with current gallery
         single_obj_data = self.data.copy()
         gallery_path = os.path.join(self.data["image_dir"], name)
-        print(self.data["image_dir"])
+        print("Main iamge directory: ", self.data["image_dir"])
         print(f"Current Image Directory: {gallery_path}")
         single_obj_data["image_dir"] = gallery_path
 
         print("Meshing")
-        command = self.make_batch_command(single_obj_data)
+        command = self.make_batch_command(single_obj_data, name)
         print("Running:", command)
         subprocess.run(command)
 
         print("Mesh Created")
         # name = self.get_name()
-        import_path = obj_import_path(self.data["work_dir"], name, self.to_node)
-        export_path = obj_export_path(self.data["work_dir"], name)
+        import_path = obj_import_path(single_obj_data["work_dir"], name, self.to_node)
+        export_path = obj_export_path(single_obj_data["work_dir"], name)
 
         print("Unwrapping")
-        blender_unwrap(self.data["blender_dir"], import_path, export_path)
+        blender_unwrap(single_obj_data["blender_dir"], import_path, export_path)
 
         print("Texturing")
         ## Edit save to use unwrapped Mesh
@@ -421,11 +421,13 @@ class ProcessorGUI(QMainWindow):
         print(f"Running: {command}")
         subprocess.run(command)
 
+
         print("\n", f"Done with {name}")
         self.rename_completed_image_dir(gallery_path)
         print("#" * 80)
 
-    def make_batch_command(self, data: dict) -> str:
+
+    def make_batch_command(self, data: dict, name: str) -> str:
         """
         makes a bash command that runs meshroom_batch.exe
         :param data: data to make command
@@ -434,7 +436,7 @@ class ProcessorGUI(QMainWindow):
         # pipeline = check_custom_pipeline_valid(data["custom_pipeline"])
         pipeline = self.custom_pipeline
 
-        name = self.get_name()
+        # name = self.get_name()
         save_path = os.path.join(data["work_dir"], name)
         ## Crashes if save_path already exists, should be prevented by validating
         os.mkdir(save_path)
