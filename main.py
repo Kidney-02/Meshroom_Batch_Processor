@@ -405,7 +405,7 @@ class ProcessorGUI(QMainWindow):
         ## Same data, but with image dirs replaced with current gallery
         single_obj_data = self.data.copy()
         gallery_path = os.path.join(self.data["image_dir"], name)
-        print("Main iamge directory: ", self.data["image_dir"])
+        print("Main image directory: ", self.data["image_dir"])
         print(f"Current Image Directory: {gallery_path}")
         single_obj_data["image_dir"] = gallery_path
 
