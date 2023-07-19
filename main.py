@@ -1,6 +1,5 @@
 import subprocess
 import os
-import glob
 import json
 from PyQt5.QtWidgets import QMainWindow, QHeaderView, QTableWidgetItem, QApplication
 from PyQt5 import uic
@@ -25,9 +24,11 @@ def check_directory_exists(path: str):
         return False
     return True
 
+
 def find_file_in_path(path: str, file_name: str) -> bool:
     files = os.listdir(path)
     return any(file.startswith(file_name) for file in files)
+
 
 def check_meshroom_batch_exists(path: str) -> bool:
     """
@@ -49,28 +50,6 @@ def check_meshroom_batch_exists(path: str) -> bool:
         print("WARNING:", "Meshroom directory doesn't contain 'meshroom_batch'")
         return False
 
-def check_task_path(path: str, name: str, task: str = "") -> bool:
-    ## Needs to check if folder with image name exists to validate
-    """
-    Checks if given directory exists and isn't used
-    :param path: work directory
-    :param name: name that will be used for creating a
-    :param task: task for which the directory is being validated (used for debug message only)
-    :return:
-    """
-    ## add space to end of task in case it doesn't have it
-    task += " " if not task.endswith(" ") and task != "" else ""
-
-    if not check_directory_exists(path):
-        print("WARNING:", f"Provided {task}directory does not exist")
-        return False
-
-    if check_directory_exists(os.path.join(path, name)):
-        print("WARNING:", f"Folder with name '{name}' already exists in provided {task}directory")
-        return False
-
-    return True
-
 
 ##########################################################################################
 ####    BLENDER    #######
@@ -86,13 +65,13 @@ def blender_unwrap(blender_dir: str, import_path: str, export_path: str):
     """
     blender_exe = os.path.join(blender_dir, "blender")
     # Start Blender process
-    blender_cmd = [f"{blender_exe}", "--background"]
-    subprocess.run(blender_cmd)
+    # blender_cmd = [f"{blender_exe}", "--background"]
+    # subprocess.run(blender_cmd)
 
     # Import, Unwrap, Pack, and Export
     # Python script as string to be run in command line
     # No indent, or it might give errors
-    unwrap_script = f"""
+    unwrap_script = fr"""
 import bpy
 
 # Select all objects
@@ -109,24 +88,15 @@ obj = bpy.context.scene.objects[0]
 bpy.context.view_layer.objects.active = obj
 bpy.ops.object.mode_set(mode='EDIT')
 
-## Perform UV unwrapping
-bpy.ops.uv.smart_project(island_margin=0.002)
-
 ## Pack UV islands
-bpy.ops.uv.select_all(action='SELECT')
-########################################################################
-##### Disabled until pack_islands is fixed in blender3.6.1 hopefully #####
-# bpy.ops.uv.pack_islands()
-########################################################################
+bpy.context.scene.tool_settings.use_uv_select_sync = True
+bpy.ops.uv.pack_islands(margin=0.001)
 
 ## Switch back to object mode
 bpy.ops.object.mode_set(mode='OBJECT')
 
 ## Export object
 bpy.ops.export_scene.obj(filepath=r'{export_path}')
-
-## Quit
-##bpy.ops.wm.quit_blender()
     """
 
     unwrap_cmd = [f"{blender_exe}", "--background", "--python-expr", unwrap_script]
@@ -243,7 +213,8 @@ class ProcessorGUI(QMainWindow):
             line.textEdited.connect(self.get_parameters)
             line.returnPressed.connect(self.validate_inputs)
 
-    def find_ui_file(self) -> str:
+    @staticmethod
+    def find_ui_file() -> str:
         # Get the current working directory
         cwd = os.getcwd()
         # Get a list of files in the directory
@@ -261,21 +232,19 @@ class ProcessorGUI(QMainWindow):
         ## Test if inputs are valid
 
         is_valid = True
-        name = self.get_name()
         print("#" * 80)
         if not check_meshroom_batch_exists(self.data["meshroom_dir"]):
             is_valid = False
         if not check_blender_exe_exists(self.data["blender_dir"]):
             is_valid = False
-        if not check_task_path(self.data["work_dir"], name, "work"):
-            is_valid = False
-        if not check_task_path(self.data["output_dir"], name, "output"):
-            is_valid = False
         if self.get_image_folders() <= 0:
+            is_valid = False
+        if not self.check_task_path(self.data["work_dir"], "work"):
+            is_valid = False
+        if not self.check_task_path(self.data["output_dir"], "output"):
             is_valid = False
         if self.get_pre_texturing_node() == "":
             is_valid = False
-
 
         print("#" * 80)
 
@@ -287,6 +256,29 @@ class ProcessorGUI(QMainWindow):
             self.button_start.setEnabled(False)
             return False
 
+    def check_task_path(self, path: str, task: str = "", debug: bool = False) -> bool:
+        ## Needs to check if folder with image name exists to validate
+        """
+        Checks if given directory exists and isn't used
+        :param debug:
+        :param path: work directory
+        :param task: task for which the directory is being validated (used for debug message only)
+        :return:
+        """
+        ## add space to end of task in case it doesn't have it
+        task += " " if not task.endswith(" ") and task != "" else ""
+
+        if not check_directory_exists(path):
+            print("WARNING:", f"Provided {task} directory does not exist")
+            return False
+
+        ## Loop image gallery folders anc check if corresponding one exists
+        for name in self.galleries:
+            if check_directory_exists(os.path.join(path, name)):
+                print("WARNING:", f"Folder with name '{name}' already exists in provided {task} directory")
+                return False
+        return True
+
     def get_parameters(self):
         self.data["meshroom_dir"] = self.line_meshroom_dir.text()
         self.data["blender_dir"] = self.line_blender_dir.text()
@@ -294,7 +286,6 @@ class ProcessorGUI(QMainWindow):
         self.data["image_dir"] = self.line_image_dir.text()
         self.data["output_dir"] = self.line_output_dir.text()
         self.data["custom_pipeline"] = self.line_pipeline.text()
-
 
     def set_parameters(self):
         self.line_meshroom_dir.setText(str(self.data["meshroom_dir"]))
@@ -304,7 +295,8 @@ class ProcessorGUI(QMainWindow):
         self.line_output_dir.setText(str(self.data["output_dir"]))
         self.line_pipeline.setText(str(self.data["custom_pipeline"]))
 
-    def check_custom_pipeline(self, path: str) -> str:
+    @staticmethod
+    def check_custom_pipeline(path: str) -> str:
         """
         Checks if custom pipeline provided is a real meshroom graph file, or checks current directory for .mg files
         :param path: pipeline file, meshroom graph template to use
@@ -367,7 +359,8 @@ class ProcessorGUI(QMainWindow):
         ## Return name
         return to_node
 
-    def get_texturing_node_name(self, loaded_data: dict):
+    @staticmethod
+    def get_texturing_node_name(loaded_data: dict):
         """
         get full name of texturing node including suffix
         :param loaded_data:
@@ -401,22 +394,19 @@ class ProcessorGUI(QMainWindow):
         :param name: name of gallery to be meshed
         :return:
         """
-        print("self.data.copy(): ", self.data.copy())
+
         ## Same data, but with image dirs replaced with current gallery
         single_obj_data = self.data.copy()
-        print("single object data ", single_obj_data)
         gallery_path = os.path.join(self.data["image_dir"], name)
-        print("Main iamge directory: ", self.data["image_dir"])
+        print(f"Main image directory: {self.data['image_dir']}")
         print(f"Current Image Directory: {gallery_path}")
         single_obj_data["image_dir"] = gallery_path
+        print(f"Pipeline: {self.custom_pipeline}")
 
         print("Meshing")
         command = self.make_batch_command(single_obj_data, name)
         print("Running:", command)
-        subprocess.run(command, shell=True)
-
-        exit()
-
+        subprocess.run(command)
 
         print("Mesh Created")
         # name = self.get_name()
@@ -432,16 +422,16 @@ class ProcessorGUI(QMainWindow):
         # print("After edit")
         command = self.make_compute_command(self.current_cache)
         print(f"Running: {command}")
-        subprocess.run(command, shell=True)
-
+        subprocess.run(command)
 
         print("\n", f"Done with {name}")
         self.rename_completed_image_dir(gallery_path)
         print("#" * 80)
 
-    def make_batch_command(self, data: dict, name: str) -> str:
+    def make_batch_command(self, data: dict, name: str, debug: bool = False) -> str:
         """
         makes a bash command that runs meshroom_batch.exe
+        :param debug:
         :param name:
         :param data: data to make command
         :return:
@@ -454,6 +444,8 @@ class ProcessorGUI(QMainWindow):
         ## Crashes if save_path already exists, should be prevented by validating
         os.mkdir(save_path)
         save_dir = os.path.join(save_path, f"{name}.mg")
+        if debug:
+            print("INFO:", f"Save directory: {save_dir}")
         self.current_cache = save_dir
 
         meshroom_batch = os.path.join(data["meshroom_dir"], "meshroom_batch")
@@ -477,10 +469,7 @@ class ProcessorGUI(QMainWindow):
         print(meshroom_compute)
         ## Get current Graph file
         graph = current_cache
-        print("Current cache:")
         print(current_cache)
-        print("Graph:")
-        print(graph)
 
         to_node = "Publish"
         ## format command
@@ -512,7 +501,8 @@ class ProcessorGUI(QMainWindow):
         except IOError:
             print("WARNING:", "An error occurred while writing the modified data to the file.")
 
-    def rename_completed_image_dir(self, completed_path: str):
+    @staticmethod
+    def rename_completed_image_dir(completed_path: str):
         """
         run this after finishing a photoscan, adds a . to the image folder to track it as ignored
         :return:
@@ -558,7 +548,8 @@ class ProcessorGUI(QMainWindow):
 
         return galleries
 
-    def count_images_in_directory(self, path: str) -> int:
+    @staticmethod
+    def count_images_in_directory(path: str) -> int:
         """
         Counts number of images in provided directory
         :param path: images directory
@@ -626,7 +617,8 @@ class ProcessorGUI(QMainWindow):
         self.validate_inputs()
         self.set_parameters()
 
-    def filter_data(self, data: dict) -> dict:
+    @staticmethod
+    def filter_data(data: dict) -> dict:
         filtered_data = {
             "meshroom_dir": data.get("meshroom_dir"),
             "blender_dir": data.get("blender_dir"),
@@ -638,7 +630,8 @@ class ProcessorGUI(QMainWindow):
         }
         return filtered_data
 
-    def info(self):
+    @staticmethod
+    def info():
         print("INFO:", "Explanation, or link to github, idk")
 
     def get_name(self):
